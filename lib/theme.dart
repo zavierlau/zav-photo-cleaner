@@ -10,6 +10,8 @@ class AppColors {
   static const Color caption = Color(0xFF86868B);
   static const Color accent = Color(0xFF0A84FF);
   static const Color danger = Color(0xFFE53935);
+  static const Color success = Color(0xFF34C759);
+  static const Color white = Color(0xFFFFFFFF);
 }
 
 class AppTheme {

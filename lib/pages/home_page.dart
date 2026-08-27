@@ -15,6 +15,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  static const int _gridCross = 4;
+
   bool _scanning = false;
   String? _notice; // 權限被拒 / 出錯提示
   ScanResult? _result;
@@ -37,8 +39,7 @@ class _HomePageState extends State<HomePage> {
         });
         return;
       }
-      final List<AssetItem> items =
-          await PhotoScanner.scanAllAssets();
+      final List<AssetItem> items = await PhotoScanner.scanAllAssets();
       final ScanResult result = PhotoScanner.buildResult(items);
 
       // 預設：每組重複留 1 張，其餘勾選為要刪除。
@@ -80,12 +81,13 @@ class _HomePageState extends State<HomePage> {
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: AppColors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('確認刪除'),
         content: Text(
-          '將刪除 ${_selected.length} 項檔案，可騰出 '
-          '${formatBytes(totalBytes)} 嘅空間。\n\n此操作會將相片/影片放入（Android）垃圾桶／永久移除，請確認。',
+          '將刪除 ${_selected.length} 項檔案，可騰出 ${formatBytes(totalBytes)} 嘅空間。\n\n'
+          '此操作會將相片／影片放入（Android）垃圾桶／永久移除，請確認。',
+          style: const TextStyle(color: AppColors.text, fontSize: 14.5),
         ),
         actions: [
           TextButton(
@@ -113,7 +115,6 @@ class _HomePageState extends State<HomePage> {
       _notice = deletedCount > 0
           ? '已刪除 $deletedCount 項，騰出約 ${formatBytes(totalBytes)} 空間。'
           : '未能刪除任何檔案，請檢查權限。';
-      // 刪完之後自動重新掃描，刷新列表。
       if (deletedCount > 0) {
         _rescanAfterDelete();
       }
@@ -122,8 +123,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _rescanAfterDelete() async {
     try {
-      final List<AssetItem> items =
-          await PhotoScanner.scanAllAssets();
+      final List<AssetItem> items = await PhotoScanner.scanAllAssets();
       final ScanResult result = PhotoScanner.buildResult(items);
       final Map<String, AssetItem> selection = <String, AssetItem>{};
       for (final DuplicateGroup g in result.duplicateGroups) {
@@ -248,165 +248,359 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildResult() {
-    final int duplicateCount = _result!.duplicateGroups
+    final ScanResult r = _result!;
+    final int dupeExtra = r.duplicateGroups
         .fold(0, (sum, g) => sum + (g.count - 1));
-    final int largeCount = _result!.largeFiles.length;
 
-    return DefaultTabController(
-      length: 3,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: _buildSummaryHeader(duplicateCount, largeCount)),
-          _buildResultTabs(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryHeader(int duplicateCount, int largeCount) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _Stat(label: '資產', value: '${_result!.all.length}'),
-              const SizedBox(width: 20),
-              _Stat(label: '重複多餘', value: '$duplicateCount'),
-              const SizedBox(width: 20),
-              _Stat(label: '大檔案', value: '$largeCount'),
-            ],
-          ),
-          const SizedBox(height: 14),
-          const Text(
-            '掃描完成，以下係分析結果。',
-            style: TextStyle(color: AppColors.caption, fontSize: 12),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildResultTabs() {
-    return Expanded(
-      child: Column(
-        children: [
-          Container(
-            margin: const EdgeInsets.fromLTRB(24, 8, 24, 8),
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: AppColors.card,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: TabBar(
-              indicator: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x11000000),
-                    blurRadius: 4,
-                    offset: Offset(0, 1),
-                  ),
-                ],
-              ),
-              labelColor: AppColors.text,
-              unselectedLabelColor: AppColors.caption,
-              labelStyle: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 13.5,
-              ),
-              unselectedLabelStyle: const TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 13.5,
-              ),
-              dividerColor: Colors.transparent,
-              indicatorSize: TabBarIndicatorSize.tab,
-              tabs: [
-                Tab(text: '重複相片 ${_result!.duplicateGroups.length}'),
-                Tab(text: '大檔案 ${_result!.largeFiles.length}'),
-                Tab(text: '可騰空間'),
-              ],
-            ),
-          ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _DuplicateTab(groups: _result!.duplicateGroups, selected: _selected, onToggle: _toggle),
-                _LargeTab(items: _result!.largeFiles, selected: _selected, onToggle: _toggle),
-                _SpaceTab(selected: _selected, result: _result!),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  final String label;
-  final String value;
-  const _Stat({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: AppColors.text,
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
+        // 空間統計細字放頂。
+        _SpaceStats(result: r, selectedBytes: _selectedBytes, dupeExtra: dupeExtra),
+        Expanded(
+          child: _ResultTabs(
+            result: r,
+            selected: _selected,
+            onToggle: _toggle,
           ),
         ),
-        Text(label, style: const TextStyle(color: AppColors.caption, fontSize: 11)),
       ],
     );
   }
 }
 
-/// 出錯相片縮圖（細圖）。
-class _AssetThumb extends StatelessWidget {
-  final AssetEntity entity;
-  final double size;
-  const _AssetThumb({required this.entity, this.size = 44});
+/// 頂部一行細細嘅空間統計。
+class _SpaceStats extends StatelessWidget {
+  final ScanResult result;
+  final int selectedBytes;
+  final int dupeExtra;
+  const _SpaceStats({
+    required this.result,
+    required this.selectedBytes,
+    required this.dupeExtra,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(6),
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: FutureBuilder<Uint8List?>(
-          future: entity.thumbnailDataWithSize(ThumbnailSize(88, 88)),
-          builder: (context, snap) {
-            final data = snap.data;
-            if (data == null) {
-              return Container(
-                color: AppColors.card,
-                child: Icon(
-                  entity.type == AssetType.video
-                      ? Icons.movie_outlined
-                      : Icons.image_outlined,
-                  color: AppColors.caption,
-                  size: size * 0.5,
-                ),
-              );
-            }
-            return Image.memory(data, fit: BoxFit.cover);
-          },
-        ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+      child: Row(
+        children: [
+          _Chip(icon: Icons.photo_library_outlined, text: '${result.all.length} 項'),
+          const SizedBox(width: 10),
+          _Chip(
+            icon: Icons.content_copy_outlined,
+            text: '重複多餘 $dupeExtra',
+          ),
+          const SizedBox(width: 10),
+          _Chip(
+            icon: Icons.insights_outlined,
+            text: '可騰 ${formatBytes(result.recoverableDuplicateBytes)}',
+            emphasize: true,
+          ),
+        ],
       ),
     );
   }
 }
 
+class _Chip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final bool emphasize;
+  const _Chip({required this.icon, required this.text, this.emphasize = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final Color color = emphasize ? AppColors.success : AppColors.caption;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 14),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResultTabs extends StatelessWidget {
+  final ScanResult result;
+  final Map<String, AssetItem> selected;
+  final void Function(AssetItem, bool) onToggle;
+  const _ResultTabs({
+    required this.result,
+    required this.selected,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 3,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: TabBar(
+                indicator: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x11000000),
+                      blurRadius: 4,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
+                ),
+                labelColor: AppColors.text,
+                unselectedLabelColor: AppColors.caption,
+                labelStyle: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13.5,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13.5,
+                ),
+                dividerColor: Colors.transparent,
+                indicatorSize: TabBarIndicatorSize.tab,
+                tabs: [
+                  Tab(text: '全部 ${result.all.length}'),
+                  Tab(text: '重複 ${result.duplicateGroups.length}'),
+                  Tab(text: '大檔案 ${result.largeFiles.length}'),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _ThumbGrid(
+                  items: result.all,
+                  selected: selected,
+                  onToggle: onToggle,
+                  emptyMessage: '冇任何相片或影片。',
+                ),
+                _DuplicateTab(
+                  groups: result.duplicateGroups,
+                  selected: selected,
+                  onToggle: onToggle,
+                ),
+                _ThumbGrid(
+                  items: result.largeFiles,
+                  selected: selected,
+                  onToggle: onToggle,
+                  emptyMessage: '冇大過 20MB 嘅檔案，好好呀 👍',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 單格方形縮圖，揀選時有綠 ✓ 圓章 + 亮色邊框。
+class _SelectableThumb extends StatelessWidget {
+  final AssetItem item;
+  final bool isSelected;
+  final bool isKept;
+  final ValueChanged<bool> onToggle;
+  const _SelectableThumb({
+    required this.item,
+    required this.isSelected,
+    required this.onToggle,
+    this.isKept = false,
+  });
+
+  Future<Uint8List?> _thumb() {
+    // 攞真縮圖（約畀 grid 格用嘅解像度）。
+    return item.entity.thumbnailDataWithSize(const ThumbnailSize(360, 360));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        if (isKept) return;
+        onToggle(!isSelected);
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            FutureBuilder<Uint8List?>(
+              future: _thumb(),
+              builder: (context, snap) {
+                final data = snap.data;
+                if (data == null) {
+                  return Container(
+                    color: AppColors.card,
+                    alignment: Alignment.center,
+                    child: Icon(
+                      item.isVideo
+                          ? Icons.movie_outlined
+                          : Icons.image_outlined,
+                      color: AppColors.caption,
+                      size: 30,
+                    ),
+                  );
+                }
+                return Image.memory(data, fit: BoxFit.cover, gaplessPlayback: true);
+              },
+            ),
+            // 影片標記。
+            if (item.isVideo)
+              const Positioned(
+                left: 6,
+                bottom: 6,
+                child: Icon(Icons.play_circle_fill, color: Colors.white70, size: 22),
+              )
+            else if (item.type == AssetType.image)
+              Positioned(
+                left: 6,
+                bottom: 6,
+                child: Text(
+                  formatBytes(item.sizeBytes),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+                  ),
+                ),
+              ),
+            // 揀選邊框（亮色）／未揀選淡淡框。
+            if (isSelected)
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.accent, width: 3.5),
+                  borderRadius: const BorderRadius.all(Radius.circular(12)),
+                ),
+              )
+            else if (!isKept)
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: const Color(0x22000000), width: 1),
+                  borderRadius: const BorderRadius.all(Radius.circular(12)),
+                ),
+              ),
+            // 右上角狀態圓章。
+            Positioned(
+              top: 5,
+              right: 5,
+              child: isKept
+                  ? _badge(
+                      color: Colors.black45,
+                      border: Colors.white,
+                      icon: Icons.bookmark,
+                      size: 12,
+                    )
+                  : isSelected
+                      ? _badge(
+                          color: AppColors.success,
+                          border: Colors.white,
+                          icon: Icons.check,
+                          size: 12,
+                        )
+                      : _badge(
+                          color: Colors.black26,
+                          border: Colors.white,
+                          icon: Icons.add,
+                          size: 12,
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _badge({
+    required Color color,
+    required Color border,
+    required IconData icon,
+    required double size,
+  }) {
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(color: border, width: 2),
+      ),
+      child: Icon(icon, color: Colors.white, size: size),
+    );
+  }
+}
+
+/// 通用大縮圖 grid（跳選模式）。
+class _ThumbGrid extends StatelessWidget {
+  final List<AssetItem> items;
+  final Map<String, AssetItem> selected;
+  final void Function(AssetItem, bool) onToggle;
+  final String emptyMessage;
+  const _ThumbGrid({
+    required this.items,
+    required this.selected,
+    required this.onToggle,
+    required this.emptyMessage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return Center(
+        child: Text(
+          emptyMessage,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: AppColors.caption, fontSize: 14),
+        ),
+      );
+    }
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: _HomePageState._gridCross,
+        crossAxisSpacing: 6,
+        mainAxisSpacing: 6,
+      ),
+      itemCount: items.length,
+      itemBuilder: (context, i) {
+        final item = items[i];
+        return _SelectableThumb(
+          item: item,
+          isSelected: selected.containsKey(item.id),
+          onToggle: (v) => onToggle(item, v),
+        );
+      },
+    );
+  }
+}
+
+/// 重複分組：每組用一行縮圖顯示，留 1 張其餘預設揀選。
 class _DuplicateTab extends StatelessWidget {
   final List<DuplicateGroup> groups;
   final Map<String, AssetItem> selected;
@@ -420,13 +614,18 @@ class _DuplicateTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (groups.isEmpty) {
-      return const _Empty(message: '搵唔到重複相片 👍');
+      return const Center(
+        child: Text(
+          '搵唔到重複相片 👍',
+          style: TextStyle(color: AppColors.caption, fontSize: 14),
+        ),
+      );
     }
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+      padding: const EdgeInsets.all(16),
       itemCount: groups.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, i) => _GroupCard(
+      itemBuilder: (context, i) => _DuplicateGroupCard(
         group: groups[i],
         selected: selected,
         onToggle: onToggle,
@@ -435,11 +634,11 @@ class _DuplicateTab extends StatelessWidget {
   }
 }
 
-class _GroupCard extends StatelessWidget {
+class _DuplicateGroupCard extends StatelessWidget {
   final DuplicateGroup group;
   final Map<String, AssetItem> selected;
   final void Function(AssetItem, bool) onToggle;
-  const _GroupCard({
+  const _DuplicateGroupCard({
     required this.group,
     required this.selected,
     required this.onToggle,
@@ -448,11 +647,14 @@ class _GroupCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final int dupeCount = group.count - 1;
+    final double cell =
+        (MediaQuery.of(context).size.width - 16 * 2 - 6 * (group.count - 1)) /
+            group.count;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.card,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -461,294 +663,40 @@ class _GroupCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '${group.count} 張重複 · ${formatBytes(group.items.fold(0, (s, a) => s + a.sizeBytes))}',
+                  '${group.count} 張重複 · ${formatBytes(group.totalMB)}',
                   style: const TextStyle(
                     color: AppColors.text,
                     fontWeight: FontWeight.w700,
-                    fontSize: 15,
+                    fontSize: 14.5,
                   ),
                 ),
               ),
               Text(
-                '保留 1 張',
-                style: const TextStyle(color: AppColors.caption, fontSize: 11.5),
+                '删 $dupeCount 張 · 可騰 ${formatBytes(dupeCount * group.items.first.sizeBytes)}',
+                style: const TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w700),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          if (dupeCount > 0)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                '可刪 $dupeCount 張，騰出 ${formatBytes(dupeCount * group.items.first.sizeBytes)}',
-                style: const TextStyle(color: AppColors.caption, fontSize: 12),
-              ),
-            ),
-          for (int k = 0; k < group.items.length; k++)
-            _AssetRow(
-              item: group.items[k],
-              isSelected: selected.containsKey(group.items[k].id),
-              isKept: k == 0,
-              onToggle: onToggle,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AssetRow extends StatelessWidget {
-  final AssetItem item;
-  final bool isSelected;
-  final bool isKept;
-  final void Function(AssetItem, bool) onToggle;
-  const _AssetRow({
-    required this.item,
-    required this.isSelected,
-    required this.isKept,
-    required this.onToggle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => onToggle(item, !isSelected),
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: [
-            _AssetThumb(entity: item.entity),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.isVideo ? '影片' : '相片',
-                    style: const TextStyle(
-                      color: AppColors.text,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
+          SizedBox(
+            height: cell,
+            child: Row(
+              children: [
+                for (int k = 0; k < group.items.length; k++) ...[
+                  if (k > 0) const SizedBox(width: 6),
+                  Expanded(
+                    child: _SelectableThumb(
+                      item: group.items[k],
+                      isKept: k == 0,
+                      isSelected: selected.containsKey(group.items[k].id),
+                      onToggle: (v) => onToggle(group.items[k], v),
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${formatBytes(item.sizeBytes)} · ${item.entity.width}×${item.entity.height}',
-                    style: const TextStyle(color: AppColors.caption, fontSize: 11.5),
-                  ),
                 ],
-              ),
-            ),
-            if (isKept)
-              const Padding(
-                padding: EdgeInsets.only(right: 4),
-                child: Text(
-                  '保留',
-                  style: TextStyle(color: AppColors.caption, fontSize: 11),
-                ),
-              )
-            else
-              Checkbox(
-                value: isSelected,
-                onChanged: (v) => onToggle(item, v ?? false),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LargeTab extends StatelessWidget {
-  final List<AssetItem> items;
-  final Map<String, AssetItem> selected;
-  final void Function(AssetItem, bool) onToggle;
-  const _LargeTab({required this.items, required this.selected, required this.onToggle});
-
-  @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return const _Empty(message: '冇大過 20MB 嘅檔案，好好呀 👍');
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const Divider(height: 1, indent: 56),
-      itemBuilder: (context, i) => _LargeRow(
-        item: items[i],
-        isSelected: selected.containsKey(items[i].id),
-        onToggle: onToggle,
-      ),
-    );
-  }
-}
-
-class _LargeRow extends StatelessWidget {
-  final AssetItem item;
-  final bool isSelected;
-  final void Function(AssetItem, bool) onToggle;
-  const _LargeRow({required this.item, required this.isSelected, required this.onToggle});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => onToggle(item, !isSelected),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
-          children: [
-            _AssetThumb(entity: item.entity),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.isVideo ? '影片' : '相片',
-                    style: const TextStyle(
-                      color: AppColors.text,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${item.entity.width}×${item.entity.height}',
-                    style: const TextStyle(color: AppColors.caption, fontSize: 11.5),
-                  ),
-                ],
-              ),
-            ),
-            Text(
-              formatBytes(item.sizeBytes),
-              style: const TextStyle(
-                color: AppColors.text,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Checkbox(
-              value: isSelected,
-              onChanged: (v) => onToggle(item, v ?? false),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SpaceTab extends StatelessWidget {
-  final Map<String, AssetItem> selected;
-  final ScanResult result;
-  const _SpaceTab({required this.selected, required this.result});
-
-  @override
-  Widget build(BuildContext context) {
-    final int bytes = selected.values.fold(0, (sum, a) => sum + a.sizeBytes);
-    final int auto = result.recoverableDuplicateBytes;
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            formatBytes(bytes),
-            style: const TextStyle(
-              color: AppColors.text,
-              fontSize: 44,
-              fontWeight: FontWeight.w800,
-              height: 1,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            '目前揀選咗嘅檔案總共可騰出嘅空間',
-            style: TextStyle(color: AppColors.caption, fontSize: 13),
-          ),
-          const SizedBox(height: 32),
-          _SpaceRow(
-            icon: Icons.content_copy_outlined,
-            label: '重複多餘（已預揀）',
-            value: formatBytes(auto),
-          ),
-          const SizedBox(height: 18),
-          _SpaceRow(
-            icon: Icons.memory_outlined,
-            label: '已揀要刪除',
-            value: formatBytes(bytes),
-            emphasize: true,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SpaceRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final bool emphasize;
-  const _SpaceRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.emphasize = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.caption, size: 22),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: emphasize ? AppColors.accent : AppColors.text,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              color: emphasize ? AppColors.accent : AppColors.text,
-              fontWeight: FontWeight.w800,
-              fontSize: 17,
+              ],
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _Empty extends StatelessWidget {
-  final String message;
-  const _Empty({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(40),
-      child: Center(
-        child: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: AppColors.caption, fontSize: 14),
-        ),
       ),
     );
   }
@@ -768,32 +716,54 @@ class _BottomDeleteBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Container(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
         decoration: const BoxDecoration(
           color: Colors.white,
           border: Border(top: BorderSide(color: Color(0xFFE5E5EA))),
         ),
-        child: SizedBox(
-          height: 52,
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: onPressed,
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.danger,
-              disabledBackgroundColor: const Color(0xFFE0E0E5),
-              disabledForegroundColor: AppColors.caption,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              textStyle: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
+        child: Row(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '已揀選 $count 項',
+                  style: const TextStyle(
+                    color: AppColors.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  freedMB,
+                  style: const TextStyle(color: AppColors.caption, fontSize: 12.5),
+                ),
+              ],
+            ),
+            const Spacer(),
+            SizedBox(
+              height: 50,
+              child: FilledButton.icon(
+                onPressed: onPressed,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.danger,
+                  disabledBackgroundColor: const Color(0xFFE0E0E5),
+                  disabledForegroundColor: AppColors.caption,
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                icon: const Icon(Icons.delete_outline, size: 20),
+                label: const Text('刪除已揀'),
               ),
             ),
-            child: onPressed == null
-                ? const Text('刪除')
-                : Text('刪除  $count 項 · $freedMB'),
-          ),
+          ],
         ),
       ),
     );
