@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 
@@ -52,6 +53,13 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _onScan() async {
+    if (kIsWeb) {
+      setState(() {
+        _scanning = false;
+        _notice = '網頁版冇得讀手機相簿（browser 限制）。請裝 Android APK 先可以掃描相片。';
+      });
+      return;
+    }
     setState(() {
       _scanning = true;
       _notice = null;
@@ -66,6 +74,13 @@ class _HomePageState extends State<HomePage> {
         return;
       }
       final List<AssetItem> items = await PhotoScanner.scanAllAssets();
+      if (items.isEmpty) {
+        setState(() {
+          _scanning = false;
+          _notice = '相簿搵唔到任何相片／影片。請確認相簿有內容，並檢查權限。';
+        });
+        return;
+      }
       final ScanResult result = (await PhotoScanner.analyze(items)).withJunk(
             await JunkScanner.scanJunk(),
           );
