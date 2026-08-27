@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../models/analysis_result.dart';
+
 /// 極簡留白配色：淺底白/淺灰、深字、細灰 caption。
 class AppColors {
   AppColors._();
@@ -12,6 +14,26 @@ class AppColors {
   static const Color danger = Color(0xFFE53935);
   static const Color success = Color(0xFF34C759);
   static const Color white = Color(0xFFFFFFFF);
+
+  /// 每個清理類別嘅專屬色，用喺空間儀表板嘅圓環同類別色塊。
+  static Color categoryColor(AssetCategory c) {
+    switch (c) {
+      case AssetCategory.duplicate:
+        return const Color(0xFFFF3B30); // 紅
+      case AssetCategory.similar:
+        return const Color(0xFFFF9500); // 橙
+      case AssetCategory.blurry:
+        return const Color(0xFFAF52DE); // 紫
+      case AssetCategory.screenshot:
+        return const Color(0xFF32ADE6); // 淺藍
+      case AssetCategory.social:
+        return const Color(0xFF34C759); // 綠
+      case AssetCategory.junk:
+        return const Color(0xFF8E8E93); // 灰
+      case AssetCategory.large:
+        return const Color(0xFF0A84FF); // 藍
+    }
+  }
 }
 
 class AppTheme {
